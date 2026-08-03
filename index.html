@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Português · Vokabeltrainer</title>
+<meta name="description" content="Vokabeltrainer für brasilianisches Portugiesisch mit Spaced Repetition. Offline nutzbar, alle Daten lokal auf dem Gerät.">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#F5F6F2">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#101613">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Português">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<main id="main">
+
+  <!-- ===== START ===== -->
+  <section class="view" id="view-home">
+    <header class="home-head">
+      <h1 id="greeting">Bom dia!</h1>
+      <p class="sub" id="countdown"></p>
+    </header>
+
+    <div id="backup-banner" class="banner hidden">
+      <div class="banner-text" id="backup-banner-text"></div>
+      <button class="btn btn-small btn-amber" id="backup-banner-btn" type="button">Exportieren</button>
+    </div>
+
+    <div id="install-hint" class="banner banner-info hidden">
+      <div class="banner-text">Tipp: In Safari über <strong>Teilen &rarr; Zum Home-Bildschirm</strong> hinzufügen, dann läuft die App im Vollbild wie eine echte App.</div>
+      <button class="icon-btn icon-btn-small" id="install-hint-close" aria-label="Hinweis schließen" type="button">&#10005;</button>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat"><div class="stat-num stat-due" id="stat-due">0</div><div class="stat-label">fällig heute</div></div>
+      <div class="stat"><div class="stat-num" id="stat-streak">0</div><div class="stat-label">Tage Streak</div></div>
+      <div class="stat"><div class="stat-num" id="stat-total">0</div><div class="stat-label">Vokabeln</div></div>
+    </div>
+
+    <button class="btn btn-play" id="btn-play" type="button" aria-label="Lernen starten">
+      <span class="play-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="26" height="26"><path d="M8 5.5v13a1 1 0 0 0 1.53.85l10.2-6.5a1 1 0 0 0 0-1.7L9.53 4.65A1 1 0 0 0 8 5.5z"/></svg>
+      </span>
+      <span class="play-text">
+        <span class="play-title">Lernen starten</span>
+        <span class="play-sub" id="play-sub">20 Minuten · Spaced Repetition</span>
+      </span>
+    </button>
+
+    <button class="btn btn-secondary" id="btn-random" type="button">&#x1F500;&nbsp; Zufällig üben</button>
+
+    <div class="card today-card">
+      <div class="today-head"><strong>Heute eingetragen</strong><span class="count-chip" id="today-count">0/10</span></div>
+      <div class="dots" id="today-dots"></div>
+      <button class="btn btn-ghost" id="btn-goto-add" type="button">+ Vokabeln eingeben</button>
+    </div>
+  </section>
+
+  <!-- ===== EINGEBEN ===== -->
+  <section class="view hidden" id="view-add">
+    <h1>Neue Vokabel</h1>
+    <p class="sub" id="add-date"></p>
+    <div class="dots dots-add" id="add-dots"></div>
+
+    <form id="add-form" autocomplete="off" novalidate>
+      <label class="field"><span>Portugiesisch *</span>
+        <input id="in-pt" type="text" lang="pt-BR" autocapitalize="off" spellcheck="false" placeholder="z.B. a saudade">
+      </label>
+      <div class="dup-hint hidden" id="dup-hint"></div>
+      <label class="field"><span>Deutsch *</span>
+        <input id="in-de" type="text" lang="de" autocapitalize="off" placeholder="z.B. die Sehnsucht">
+      </label>
+      <label class="field"><span>Beispielsatz (optional)</span>
+        <textarea id="in-ex" lang="pt-BR" rows="2" placeholder="z.B. Que saudade de você!"></textarea>
+      </label>
+      <button class="btn btn-primary" type="submit">Speichern</button>
+    </form>
+
+    <div class="today-section">
+      <h2 id="today-list-head">Heute eingetragen</h2>
+      <p class="sub small">Bearbeiten und Löschen geht im Tab &bdquo;Vokabeln&ldquo;.</p>
+      <div id="today-list"></div>
+    </div>
+  </section>
+
+  <!-- ===== VOKABELN ===== -->
+  <section class="view hidden" id="view-list">
+    <h1>Meine Vokabeln <span class="count-chip" id="list-count">0</span></h1>
+    <input type="search" id="search" placeholder="Suchen ..." autocapitalize="off" spellcheck="false">
+    <p class="sub small">Zum Bearbeiten oder Löschen auf eine Vokabel tippen.</p>
+    <div id="weeks"></div>
+  </section>
+
+  <!-- ===== BACKUP ===== -->
+  <section class="view hidden" id="view-backup">
+    <h1>Backup &amp; Daten</h1>
+
+    <div class="card">
+      <h2>Backup</h2>
+      <p class="sub" id="last-export"></p>
+      <button class="btn btn-primary" id="btn-export" type="button">Backup exportieren (JSON)</button>
+      <button class="btn btn-secondary btn-gap" id="btn-import" type="button">Backup importieren</button>
+      <input type="file" id="file-import" accept=".json,application/json" hidden>
+    </div>
+
+    <div class="card">
+      <h2>Automatische Snapshots</h2>
+      <p class="sub small">Beim ersten Öffnen pro Tag wird automatisch eine Sicherheitskopie gespeichert. Die letzten 10 bleiben erhalten und können hier wiederhergestellt werden.</p>
+      <div id="snap-list"></div>
+    </div>
+
+    <div class="card">
+      <h2>App-Info</h2>
+      <p class="sub">Version <strong id="app-version"></strong> · <span id="data-size"></span></p>
+      <div id="changelog" class="changelog"></div>
+      <p class="sub small">Alle Daten liegen ausschließlich lokal auf diesem Gerät (kein Server, keine Cloud). Regelmäßige Exporte schützen vor Datenverlust, z.B. bei Gerätewechsel oder gelöschtem Browser-Speicher.</p>
+    </div>
+  </section>
+</main>
+
+<!-- ===== TAB BAR ===== -->
+<nav class="tabbar">
+  <button data-tab="home" class="tab active" type="button" aria-label="Start">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V20a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V9.5"/></svg>
+    <span>Start</span>
+  </button>
+  <button data-tab="add" class="tab" type="button" aria-label="Eingeben">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8.2v7.6M8.2 12h7.6"/></svg>
+    <span>Eingeben</span>
+  </button>
+  <button data-tab="list" class="tab" type="button" aria-label="Vokabeln">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19a2 2 0 0 0 2 2h13"/><path d="M9 7h6"/></svg>
+    <span>Vokabeln</span>
+  </button>
+  <button data-tab="backup" class="tab" type="button" aria-label="Backup">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5.2c0 4.4-2.9 7.3-7 8.8-4.1-1.5-7-4.4-7-8.8V6z"/><path d="M9 12l2 2 4-4"/></svg>
+    <span>Backup</span>
+    <span id="tab-backup-dot" class="dot-badge hidden"></span>
+  </button>
+</nav>
+
+<!-- ===== LERN-SESSION (Overlay) ===== -->
+<div id="session" class="session hidden">
+  <div class="session-top">
+    <button class="icon-btn" id="session-close" aria-label="Session beenden" type="button">&#10005;</button>
+    <div class="session-timer" id="session-timer">20:00</div>
+    <div class="session-progress" id="session-progress">0 &#10003;</div>
+  </div>
+  <div class="session-mode sub small" id="session-mode"></div>
+
+  <div class="fc-wrap">
+    <div class="fc" id="fc" role="button" tabindex="0" aria-label="Karte umdrehen">
+      <div class="fc-face fc-front">
+        <div class="fc-chip">Português</div>
+        <div class="fc-word" id="fc-front-word"></div>
+        <div class="fc-hint">Tippen zum Umdrehen</div>
+      </div>
+      <div class="fc-face fc-back">
+        <div class="fc-chip">Deutsch</div>
+        <div class="fc-word fc-word-back" id="fc-back-word"></div>
+        <div class="fc-example" id="fc-example"></div>
+        <div class="fc-small" id="fc-back-small"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rate-row" id="rate-row">
+    <button class="btn rate rate-fail" data-grade="0" type="button">Nicht gewusst</button>
+    <button class="btn rate rate-hard" data-grade="1" type="button">Unsicher</button>
+    <button class="btn rate rate-good" data-grade="2" type="button">Gewusst</button>
+  </div>
+  <div class="session-note sub small" id="session-note"></div>
+
+  <div class="session-summary hidden" id="session-summary"></div>
+</div>
+
+<div id="toast" class="toast hidden" role="status"></div>
+<script src="./app.js" defer></script>
+</body>
+</html>
