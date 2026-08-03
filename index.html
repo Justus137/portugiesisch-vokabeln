@@ -36,6 +36,12 @@
       <button class="icon-btn icon-btn-small" id="install-hint-close" aria-label="Hinweis schließen" type="button">&#10005;</button>
     </div>
 
+    <div id="badge-hint" class="banner banner-info hidden">
+      <div class="banner-text">Fällige Karten als rote Zahl am App-Icon anzeigen? iOS fragt dafür nach der Mitteilungs-Erlaubnis - gesendet wird nichts, sie ist nur für das Badge nötig.</div>
+      <button class="btn btn-small btn-primary" id="badge-hint-btn" type="button">Aktivieren</button>
+      <button class="icon-btn icon-btn-small" id="badge-hint-close" aria-label="Hinweis schließen" type="button">&#10005;</button>
+    </div>
+
     <div class="stats-row">
       <div class="stat"><div class="stat-num stat-due" id="stat-due">0</div><div class="stat-label">fällig heute</div></div>
       <div class="stat"><div class="stat-num" id="stat-streak">0</div><div class="stat-label">Tage Streak</div></div>
@@ -57,6 +63,7 @@
     <div class="card today-card">
       <div class="today-head"><strong>Heute eingetragen</strong><span class="count-chip" id="today-count">0/10</span></div>
       <div class="dots" id="today-dots"></div>
+      <div class="sub small hidden" id="prognosis"></div>
       <button class="btn btn-ghost" id="btn-goto-add" type="button">+ Vokabeln eingeben</button>
     </div>
   </section>
@@ -93,6 +100,7 @@
     <h1>Meine Vokabeln <span class="count-chip" id="list-count">0</span></h1>
     <input type="search" id="search" placeholder="Suchen ..." autocapitalize="off" spellcheck="false">
     <p class="sub small">Zum Bearbeiten oder Löschen auf eine Vokabel tippen.</p>
+    <div id="leeches"></div>
     <div id="weeks"></div>
   </section>
 

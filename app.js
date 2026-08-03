@@ -6,14 +6,16 @@
    Spaced Repetition: vereinfachtes SM-2 mit 3 Bewertungsstufen
    ===================================================================== */
 
-const APP_VERSION = '1.0.1';
+const APP_VERSION = '1.1.0';
 const CHANGELOG = [
+  { v: '1.1.0', date: '2026-08-03', notes: 'Problemwörter-Liste in der Vokabelübersicht, Tempo-Prognose auf dem Start-Screen, App-Badge mit fälligen Karten (installierte App, iOS 16.4+)' },
   { v: '1.0.1', date: '2026-08-03', notes: 'Countdown-Zieldatum auf 2.2.2027 korrigiert' },
   { v: '1.0.0', date: '2026-08-03', notes: 'Erste Version: Vokabeleingabe, Wochenübersicht, SM-2 Lern-Sessions (20 Min), Zufallsmodus, Export/Import, Auto-Snapshots, Statistik' }
 ];
 
 const LS_KEY = 'ptvok.data.v1';
 const DAILY_GOAL = 10;
+const LEECH_LAPSES = 4;             // ab so vielen Fehlversuchen gilt ein Wort als Problemwort
 const SESSION_MINUTES = 20;
 const SNAP_KEEP = 10;
 const MAX_INTERVAL = 180;           // Tage
@@ -121,6 +123,18 @@ function saveData() {
     console.error('saveData', e);
     toast('Speichern fehlgeschlagen! Bitte Backup exportieren.', 4000);
   }
+  updateBadge();
+}
+
+/* App-Badge: Anzahl faelliger Karten am Home-Bildschirm-Icon.
+   Auf iOS (16.4+, installierte App) braucht das die Mitteilungs-Erlaubnis. */
+function updateBadge() {
+  if (!('setAppBadge' in navigator) || !state) return;
+  try {
+    const n = state.cards.filter((c) => c.due <= today()).length;
+    const p = n > 0 ? navigator.setAppBadge(n) : navigator.clearAppBadge();
+    if (p && p.catch) p.catch(() => {});
+  } catch (e) { /* Browser ohne Badge-Support */ }
 }
 
 function newCard(pt, de, example) {
@@ -246,6 +260,20 @@ function updateBackupBadge() {
   $('#tab-backup-dot').classList.toggle('hidden', !backupDueInfo().show);
 }
 
+/* Prognose: bisheriges Eingabe-Tempo hochgerechnet bis zum Zieldatum */
+function prognosis() {
+  if (!state.cards.length) return null;
+  const rest = dayDiff(today(), TARGET_DATE);
+  if (rest <= 0) return null;
+  const elapsed = Math.max(1, dayDiff(firstDayStr(), today()) + 1);
+  const pace = state.cards.length / elapsed;
+  const projected = Math.max(state.cards.length, Math.round((state.cards.length + pace * rest) / 10) * 10);
+  return {
+    paceTxt: pace.toLocaleString('de-DE', { maximumFractionDigits: 1 }),
+    projectedTxt: projected.toLocaleString('de-DE')
+  };
+}
+
 function renderHome() {
   const h = new Date().getHours();
   $('#greeting').textContent = h < 11 ? 'Bom dia! ☀️' : h < 18 ? 'Boa tarde! 👋' : 'Boa noite! 🌙';
@@ -268,6 +296,15 @@ function renderHome() {
   $('#today-count').textContent = `${added}/${DAILY_GOAL}`;
   $('#today-dots').innerHTML = dotsHTML(added);
 
+  const prog = prognosis();
+  const progEl = $('#prognosis');
+  if (prog) {
+    progEl.textContent = `Bei deinem Tempo (Ø ${prog.paceTxt}/Tag): ca. ${prog.projectedTxt} Vokabeln bis zum ${fmtShort(TARGET_DATE)}${TARGET_DATE.slice(0, 4)}`;
+    progEl.classList.remove('hidden');
+  } else {
+    progEl.classList.add('hidden');
+  }
+
   const info = backupDueInfo();
   $('#backup-banner').classList.toggle('hidden', !info.show);
   if (info.show) $('#backup-banner-text').textContent = info.text;
@@ -275,6 +312,10 @@ function renderHome() {
   const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent);
   const standalone = navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
   $('#install-hint').classList.toggle('hidden', !(isIOS && !standalone && !state.meta.hideInstallHint));
+
+  const canBadge = 'setAppBadge' in navigator && 'Notification' in window;
+  const showBadgeHint = canBadge && standalone && Notification.permission === 'default' && !state.meta.hideBadgeHint;
+  $('#badge-hint').classList.toggle('hidden', !showBadgeHint);
 }
 
 function dotsHTML(n) {
@@ -338,12 +379,40 @@ function handleAdd(e) {
 
 /* ---------- Vokabel-Liste ---------- */
 
-let openWeeks = null; // Set der aufgeklappten Wochen
+let openWeeks = null;    // Set der aufgeklappten Wochen
+let openLeeches = false; // Problemwörter-Box auf/zu
+
+function leechesHTML() {
+  const ls = state.cards.filter((c) => c.lapses >= LEECH_LAPSES).sort((a, b) => b.lapses - a.lapses);
+  if (!ls.length) return '';
+  const rows = ls.map((c) => `
+    <div class="vrow" data-id="${c.id}">
+      <span class="vstat ${cardStatusClass(c)}"></span>
+      <div class="vmain">
+        <div class="vpt">${esc(c.pt)}</div>
+        <div class="vde">${esc(c.de)}</div>
+      </div>
+      <span class="vlapses">${c.lapses}x ✗</span>
+    </div>`).join('');
+  return `
+    <details class="week leech-box"${openLeeches ? ' open' : ''}>
+      <summary>
+        <div>
+          <div class="week-title">⚠️ Problemwörter</div>
+          <div class="week-meta">${ls.length} Vokabel${ls.length === 1 ? '' : 'n'} mit ${LEECH_LAPSES}+ Fehlversuchen</div>
+        </div>
+        <span class="chev">›</span>
+      </summary>
+      <div class="leech-note">Diese Wörter brauchen einen neuen Zugang: Beispielsatz ändern oder Eselsbrücke ergänzen (antippen zum Bearbeiten).</div>
+      ${rows}
+    </details>`;
+}
 
 function renderWeeks() {
   const wrap = $('#weeks');
   $('#list-count').textContent = state.cards.length;
   const q = norm($('#search').value);
+  $('#leeches').innerHTML = (!q && state.cards.length) ? leechesHTML() : '';
 
   if (!state.cards.length) {
     wrap.innerHTML = `<div class="empty-state"><div class="big">📚</div>Noch keine Vokabeln.<br>Trage im Tab &bdquo;Eingeben&ldquo; deine ersten 10 ein!</div>`;
@@ -424,10 +493,11 @@ function openEdit(id) {
   if (!c) return;
   const inDays = dayDiff(today(), c.due);
   const dueTxt = c.due <= today() ? 'heute' : fmtShort(c.due) + (inDays === 1 ? ' (morgen)' : ` (in ${inDays} Tagen)`);
+  const lapsTxt = c.lapses > 0 ? ` · ${c.lapses}x nicht gewusst` : '';
   const bd = openOverlay(`
     <div class="sheet">
       <h3>Vokabel bearbeiten</h3>
-      <div class="meta">Eingetragen am ${fmtShort(c.createdAt)} (Woche ${weekIndexOf(c.createdAt)}) · ${c.reps}x richtig wiederholt · Nächste Wiederholung: ${dueTxt}</div>
+      <div class="meta">Eingetragen am ${fmtShort(c.createdAt)} (Woche ${weekIndexOf(c.createdAt)}) · ${c.reps}x richtig wiederholt${lapsTxt} · Nächste Wiederholung: ${dueTxt}</div>
       <label class="field"><span>Portugiesisch</span><input id="ed-pt" type="text" lang="pt-BR" autocapitalize="off" value="${esc(c.pt)}"></label>
       <label class="field"><span>Deutsch</span><input id="ed-de" type="text" lang="de" autocapitalize="off" value="${esc(c.de)}"></label>
       <label class="field"><span>Beispielsatz</span><textarea id="ed-ex" lang="pt-BR" rows="2">${esc(c.example)}</textarea></label>
@@ -906,6 +976,29 @@ function bindEvents() {
     }
   }, true);
 
+  const leeches = $('#leeches');
+  leeches.addEventListener('click', (e) => {
+    const row = e.target.closest('.vrow');
+    if (row && row.dataset.id) openEdit(row.dataset.id);
+  });
+  leeches.addEventListener('toggle', (e) => {
+    const d = e.target;
+    if (d.classList && d.classList.contains('leech-box')) openLeeches = d.open;
+  }, true);
+
+  $('#badge-hint-btn').addEventListener('click', async () => {
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm === 'granted') { updateBadge(); toast('App-Badge aktiviert ✓'); }
+    } catch (e) { /* egal */ }
+    renderHome();
+  });
+  $('#badge-hint-close').addEventListener('click', () => {
+    state.meta.hideBadgeHint = true;
+    saveData();
+    $('#badge-hint').classList.add('hidden');
+  });
+
   $('#fc').addEventListener('click', flipCard);
   $('#fc').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flipCard(); } });
   document.querySelectorAll('.rate').forEach((b) => b.addEventListener('click', () => rate(Number(b.dataset.grade))));
@@ -928,6 +1021,7 @@ function bindEvents() {
       maybeDailySnapshot();
       if (!S) renderCurrentView();
     }
+    updateBadge();
   });
 }
 
@@ -936,6 +1030,7 @@ function init() {
   bindEvents();
   renderCurrentView();
   maybeDailySnapshot();
+  updateBadge();
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch((e) => console.warn('SW-Registrierung fehlgeschlagen', e));
   }
