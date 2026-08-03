@@ -6,8 +6,9 @@
    Spaced Repetition: vereinfachtes SM-2 mit 3 Bewertungsstufen
    ===================================================================== */
 
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.0.1';
 const CHANGELOG = [
+  { v: '1.0.1', date: '2026-08-03', notes: 'Countdown-Zieldatum auf 2.2.2027 korrigiert' },
   { v: '1.0.0', date: '2026-08-03', notes: 'Erste Version: Vokabeleingabe, Wochenübersicht, SM-2 Lern-Sessions (20 Min), Zufallsmodus, Export/Import, Auto-Snapshots, Statistik' }
 ];
 
@@ -16,7 +17,7 @@ const DAILY_GOAL = 10;
 const SESSION_MINUTES = 20;
 const SNAP_KEEP = 10;
 const MAX_INTERVAL = 180;           // Tage
-const TARGET_DATE = '2027-02-01';   // Start São Paulo
+const TARGET_DATE = '2027-02-02';   // Start Auslandssemester São Paulo
 
 /* ================= Utilities ================= */
 

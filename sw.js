@@ -1,6 +1,6 @@
 /* Service Worker: Netzwerk zuerst, Cache als Offline-Fallback.
    Dadurch kommen Code-Updates sofort an, die App startet aber auch offline. */
-const CACHE = 'ptvok-v1.0.0';
+const CACHE = 'ptvok-v1.0.1';
 const ASSETS = [
   './',
   './index.html',
