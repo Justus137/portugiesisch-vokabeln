@@ -202,11 +202,14 @@ details[open] .chev{transform:rotate(90deg)}
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   padding:30px 24px;text-align:center;overflow:hidden;
 }
-.fc-back{transform:rotateY(180deg)}
+.fc-back{transform:rotateY(180deg);justify-content:flex-start;overflow-y:auto}
+.fc-back-content{margin:auto;width:100%;display:flex;flex-direction:column;align-items:center;padding:16px 0 30px}
+.fc-example-de{color:var(--muted);font-size:14px;margin-top:4px}
 .fc-chip{
   position:absolute;top:16px;left:16px;background:var(--surface2);color:var(--muted);
   font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;letter-spacing:.05em;text-transform:uppercase;
 }
+.fc-speak{position:absolute;top:10px;right:10px;width:42px;height:42px;font-size:17px}
 .fc-word{font-size:clamp(28px,8vw,42px);font-weight:800;letter-spacing:-.02em;overflow-wrap:anywhere}
 .fc-word-back{font-size:clamp(24px,7vw,36px)}
 .fc-example{color:var(--muted);font-size:16.5px;font-style:italic;margin-top:16px;overflow-wrap:anywhere}

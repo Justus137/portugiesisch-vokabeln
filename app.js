@@ -6,8 +6,10 @@
    Spaced Repetition: vereinfachtes SM-2 mit 3 Bewertungsstufen
    ===================================================================== */
 
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.3.0';
 const CHANGELOG = [
+  { v: '1.3.0', date: '2026-08-04', notes: 'Aussprache per Lautsprecher-Button (brasilianische Systemstimme, offline) und deutsche Übersetzung unter jedem Beispielsatz des Starterpakets' },
+  { v: '1.2.1', date: '2026-08-04', notes: 'Zufallsmodus zieht nur noch Vokabeln, die schon mindestens einmal gelernt wurden' },
   { v: '1.2.0', date: '2026-08-04', notes: 'Starterpaket: die 2.500 häufigsten Vokabeln (OpenSubtitles-Frequenz) mit Beispielsätzen und Präsens-Konjugation bei Verben, 20 neue pro Tag' },
   { v: '1.1.0', date: '2026-08-03', notes: 'Problemwörter-Liste in der Vokabelübersicht, Tempo-Prognose auf dem Start-Screen, App-Badge mit fälligen Karten (installierte App, iOS 16.4+)' },
   { v: '1.0.1', date: '2026-08-03', notes: 'Countdown-Zieldatum auf 2.2.2027 korrigiert' },
@@ -68,6 +70,41 @@ function toast(msg, ms = 2200) {
     el.classList.add('fade');
     setTimeout(() => el.classList.add('hidden'), 300);
   }, ms);
+}
+
+/* ================= Aussprache (Web Speech API, pt-BR) ================= */
+
+let ptVoice = null;
+
+function pickPtVoice() {
+  try {
+    const vs = speechSynthesis.getVoices();
+    ptVoice = vs.find((v) => v.lang === 'pt-BR')
+      || vs.find((v) => v.lang && v.lang.replace('_', '-').toLowerCase().startsWith('pt-br'))
+      || vs.find((v) => v.lang && v.lang.toLowerCase().startsWith('pt'))
+      || null;
+  } catch (e) { /* keine Sprachausgabe verfuegbar */ }
+}
+
+function speak(text) {
+  if (!('speechSynthesis' in window)) {
+    toast('Sprachausgabe wird von diesem Browser nicht unterstützt');
+    return;
+  }
+  if (!ptVoice) pickPtVoice();
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'pt-BR';
+  if (ptVoice) u.voice = ptVoice;
+  u.rate = 0.9;
+  speechSynthesis.speak(u);
+}
+
+/* "o amigo / a amiga" -> "o amigo, a amiga" (fluessiger vorzulesen) */
+function speakText(pt, example) {
+  let t = String(pt || '').replace(/\s*\/\s*/g, ', ');
+  if (example) t += '. ' + example;
+  return t;
 }
 
 /* ================= Modals ================= */
@@ -167,6 +204,11 @@ function bumpActivity(key) {
 function dueCards() {
   const t = today();
   return state.cards.filter((c) => c.due <= t).sort((a, b) => (a.due < b.due ? -1 : a.due > b.due ? 1 : a.createdTs - b.createdTs));
+}
+
+/* Gelernt = mindestens einmal in einer Lern-Session bewertet */
+function learnedCards() {
+  return state.cards.filter((c) => c.last);
 }
 
 function firstDayStr() {
@@ -274,6 +316,7 @@ function unlockPackCards(force) {
     const w = p.queue.shift();
     if (!w || !w.pt || !w.de || existing.has(dedupKey(w.pt))) continue;
     const card = newCard(w.pt, w.de, w.ex || '');
+    if (w.exd) card.exampleDe = w.exd;
     if (Array.isArray(w.c) && w.c.length === 6) card.conj = w.c;
     card.pack = 1;
     state.cards.push(card);
@@ -293,6 +336,40 @@ function maybeDailyUnlock() {
     toast(`${n} neue Starterpaket-Vokabeln freigeschaltet 📦`, 3000);
     if (!S) renderCurrentView();
   }
+}
+
+/* Einmalige Nachruestung: deutsche Beispielsatz-Uebersetzungen fuer Karten,
+   die noch aus einer Deck-Version ohne "exd" stammen */
+async function backfillPackTranslations() {
+  if (state.meta.exdBackfill) return;
+  const needCards = state.cards.some((c) => c.pack && c.example && !c.exampleDe);
+  const needQueue = !!(state.pack && state.pack.queue.length && !state.pack.queue[0].exd);
+  if (!needCards && !needQueue) {
+    if (state.pack || state.cards.some((c) => c.pack)) { state.meta.exdBackfill = true; saveData(); }
+    return;
+  }
+  try {
+    const res = await fetch(PACK_URL);
+    if (!res.ok) return;
+    const deck = await res.json();
+    const map = new Map(deck.words.map((w) => [dedupKey(w.pt), w]));
+    for (const c of state.cards) {
+      if (c.pack && !c.exampleDe) {
+        const w = map.get(dedupKey(c.pt));
+        if (w && w.exd) c.exampleDe = w.exd;
+      }
+    }
+    if (state.pack) {
+      state.pack.queue = state.pack.queue.map((q) => {
+        if (q.exd) return q;
+        const w = map.get(dedupKey(q.pt));
+        return (w && w.exd) ? Object.assign({}, q, { exd: w.exd }) : q;
+      });
+    }
+    state.meta.exdBackfill = true;
+    saveData();
+    if (!S) renderCurrentView();
+  } catch (e) { /* beim naechsten Start erneut versuchen */ }
 }
 
 /* ================= Views / Navigation ================= */
@@ -616,6 +693,7 @@ function openEdit(id) {
       <label class="field"><span>Portugiesisch</span><input id="ed-pt" type="text" lang="pt-BR" autocapitalize="off" value="${esc(c.pt)}"></label>
       <label class="field"><span>Deutsch</span><input id="ed-de" type="text" lang="de" autocapitalize="off" value="${esc(c.de)}"></label>
       <label class="field"><span>Beispielsatz</span><textarea id="ed-ex" lang="pt-BR" rows="2">${esc(c.example)}</textarea></label>
+      <label class="field"><span>Übersetzung des Beispielsatzes</span><textarea id="ed-exd" lang="de" rows="2">${esc(c.exampleDe || '')}</textarea></label>
       <div class="sheet-btns">
         <button class="btn btn-primary" data-act="save" type="button">Speichern</button>
         <button class="btn btn-danger" data-act="del" type="button">Löschen</button>
@@ -629,8 +707,11 @@ function openEdit(id) {
     const pt = bd.querySelector('#ed-pt').value.trim();
     const de = bd.querySelector('#ed-de').value.trim();
     const ex = bd.querySelector('#ed-ex').value.trim();
+    const exd = bd.querySelector('#ed-exd').value.trim();
     if (!pt || !de) { toast('Portugiesisch und Deutsch dürfen nicht leer sein'); return; }
-    c.pt = pt; c.de = de; c.example = ex; c.updatedAt = Date.now();
+    c.pt = pt; c.de = de; c.example = ex;
+    if (exd) c.exampleDe = exd; else delete c.exampleDe;
+    c.updatedAt = Date.now();
     saveData();
     bd.remove();
     renderWeeks();
@@ -666,13 +747,17 @@ function startSession(mode) {
     if (!queue.length) {
       showConfirm({
         title: 'Keine Karten fällig 🎉',
-        text: 'Alle Wiederholungen sind erledigt. Möchtest du stattdessen zufällige Vokabeln üben?',
+        text: 'Alle Wiederholungen sind erledigt. Möchtest du stattdessen zufällig bereits gelernte Vokabeln üben?',
         confirmLabel: 'Zufällig üben', cancelLabel: 'Später'
       }).then((ok) => { if (ok) startSession('random'); });
       return;
     }
   } else {
-    queue = shuffle(state.cards.map((c) => c.id));
+    queue = shuffle(learnedCards().map((c) => c.id));
+    if (!queue.length) {
+      toast('Noch keine gelernten Vokabeln - starte zuerst eine Lern-Session!', 3500);
+      return;
+    }
   }
 
   S = {
@@ -686,7 +771,7 @@ function startSession(mode) {
   $('#session-summary').innerHTML = '';
   $('#session').classList.remove('hidden');
   document.body.classList.add('no-scroll');
-  $('#session-mode').textContent = mode === 'sr' ? 'Wiederholung nach Lernplan' : 'Zufallsmodus · ohne Wertung für den Lernplan';
+  $('#session-mode').textContent = mode === 'sr' ? 'Wiederholung nach Lernplan' : 'Zufallsmodus · nur gelernte Vokabeln · ohne Wertung';
   S.timer = setInterval(tick, 500);
   tick();
   nextCard();
@@ -709,8 +794,9 @@ function nextCard() {
   if (!S) return;
   if (timeUp()) return endSession('time');
   if (S.pos >= S.queue.length) {
-    if (S.mode === 'random' && state.cards.length) {
-      S.queue = shuffle(state.cards.map((c) => c.id));
+    const pool = S.mode === 'random' ? learnedCards() : [];
+    if (S.mode === 'random' && pool.length) {
+      S.queue = shuffle(pool.map((c) => c.id));
       S.pos = 0;
     } else {
       return endSession('empty');
@@ -729,6 +815,8 @@ function nextCard() {
   $('#fc-back-word').textContent = c.de;
   $('#fc-example').textContent = c.example || '';
   $('#fc-example').style.display = c.example ? '' : 'none';
+  $('#fc-example-de').textContent = c.exampleDe || '';
+  $('#fc-example-de').style.display = (c.example && c.exampleDe) ? '' : 'none';
   $('#fc-back-small').textContent = c.pt;
 
   const conjEl = $('#fc-conj');
@@ -907,6 +995,7 @@ function normalizeImported(obj) {
     if (Array.isArray(raw.conj) && raw.conj.length === 6 && raw.conj.every((f) => typeof f === 'string' && f)) {
       c.conj = raw.conj;
     }
+    if (typeof raw.exampleDe === 'string' && raw.exampleDe) c.exampleDe = raw.exampleDe;
     if (raw.pack) c.pack = 1;
     cards.push(c);
   }
@@ -1160,6 +1249,21 @@ function bindEvents() {
 
   $('#fc').addEventListener('click', flipCard);
   $('#fc').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flipCard(); } });
+
+  $('#fc-speak-front').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const c = S && getCard(S.currentId);
+    if (c) speak(speakText(c.pt));
+  });
+  $('#fc-speak-back').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const c = S && getCard(S.currentId);
+    if (c) speak(speakText(c.pt, c.example));
+  });
+  if ('speechSynthesis' in window) {
+    pickPtVoice();
+    speechSynthesis.onvoiceschanged = pickPtVoice;
+  }
   document.querySelectorAll('.rate').forEach((b) => b.addEventListener('click', () => rate(Number(b.dataset.grade))));
   $('#session-close').addEventListener('click', confirmAbort);
 
@@ -1193,6 +1297,7 @@ function init() {
   bindEvents();
   maybeDailyUnlock();
   renderCurrentView();
+  backfillPackTranslations();
   maybeDailySnapshot();
   updateBadge();
   if ('serviceWorker' in navigator) {

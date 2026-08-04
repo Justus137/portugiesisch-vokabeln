@@ -177,14 +177,19 @@
     <div class="fc" id="fc" role="button" tabindex="0" aria-label="Karte umdrehen">
       <div class="fc-face fc-front">
         <div class="fc-chip">Português</div>
+        <button class="icon-btn fc-speak" id="fc-speak-front" aria-label="Aussprache anhören" type="button">🔊</button>
         <div class="fc-word" id="fc-front-word"></div>
         <div class="fc-hint">Tippen zum Umdrehen</div>
       </div>
       <div class="fc-face fc-back">
         <div class="fc-chip">Deutsch</div>
-        <div class="fc-word fc-word-back" id="fc-back-word"></div>
-        <div class="fc-example" id="fc-example"></div>
-        <div class="fc-conj hidden" id="fc-conj"></div>
+        <button class="icon-btn fc-speak" id="fc-speak-back" aria-label="Aussprache anhören" type="button">🔊</button>
+        <div class="fc-back-content">
+          <div class="fc-word fc-word-back" id="fc-back-word"></div>
+          <div class="fc-example" id="fc-example"></div>
+          <div class="fc-example-de" id="fc-example-de"></div>
+          <div class="fc-conj hidden" id="fc-conj"></div>
+        </div>
         <div class="fc-small" id="fc-back-small"></div>
       </div>
     </div>

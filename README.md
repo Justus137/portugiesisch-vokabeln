@@ -8,7 +8,8 @@ Läuft komplett im Browser, alle Daten bleiben lokal auf dem Gerät (localStorag
 ## Features
 
 - Tägliche Eingabe von Vokabeln (Ziel: 10 pro Tag), automatisch nach Datum und Woche gruppiert
-- Starterpaket: die 2.500 häufigsten brasilianischen Vokabeln (`deck-freq2500.json`) mit Beispielsätzen und Präsens-Konjugation bei Verben, Freischaltung 20 pro Tag
+- Starterpaket: die 2.500 häufigsten brasilianischen Vokabeln (`deck-freq2500.json`) mit Beispielsätzen inkl. deutscher Übersetzung und Präsens-Konjugation bei Verben, Freischaltung 20 pro Tag
+- Aussprache: Lautsprecher-Button auf der Karteikarte (Web Speech API, brasilianische Systemstimme, offline)
 - Wochenübersicht mit Bearbeiten und Löschen (Suche über alle Vokabeln, auch noch gesperrte Paket-Wörter)
 - Lern-Session mit 20-Minuten-Timer und Spaced Repetition (vereinfachtes SM-2, 3 Bewertungsstufen)
 - Zufallsmodus ohne Einfluss auf den Lernplan
