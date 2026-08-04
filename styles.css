@@ -2,6 +2,7 @@
    Stil: Pfirsich-Verlauf oben, cremefarbener Hintergrund, weiße Karten mit
    großen Radien und weichen Schatten, Orange als Akzent, Serifen-Headlines */
 :root{
+  color-scheme:light;               /* App ist immer hell, auch bei System-Dark-Mode */
   --bg:#F6F1EA;                     /* warmes Creme */
   --surface:#FFFFFF;
   --surface2:#F3EDE4;               /* Chips/Füllflächen auf Weiß */
@@ -30,33 +31,7 @@
   --peach:#F5D3BC;                  /* Verlauf oben (Inspiration 2) */
   --font-display:"New York","SF Pro Display",ui-serif,Georgia,"Times New Roman",serif;
 }
-@media (prefers-color-scheme: dark){
-  :root{
-    --bg:#191512;                   /* warmes Dunkelbraun statt Schwarz */
-    --surface:#241F1A;
-    --surface2:#312A23;
-    --text:#F4EEE6;
-    --muted:#A79B8C;
-    --muted3:#6E6357;
-    --line:#332C25;
-    --primary:#F08A4E;
-    --primary-press:#E0743A;
-    --on-primary:#2A1305;
-    --primary-soft:#3A2A1E;
-    --primary-grad:linear-gradient(135deg,#F0854A 0%,#D9561E 100%);
-    --yellow:#F5C33B;
-    --amber:#EFA93F;
-    --amber-bg:#3A2F1B;
-    --amber-text:#F0BC6A;
-    --red:#EF6A5E;
-    --red-bg:#3D2522;
-    --green:#57B876;
-    --green-bg:#22342A;
-    --card-shadow:0 6px 24px rgba(0,0,0,.35);
-    --card-shadow-big:0 14px 34px rgba(0,0,0,.45);
-    --peach:#3C2A1E;
-  }
-}
+/* Kein Dark Mode: die App bleibt bewusst immer im hellen Creme-Design */
 
 /* ===== Basis ===== */
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -222,9 +197,6 @@ details[open] .chev{transform:rotate(90deg)}
   box-shadow:0 -6px 24px rgba(90,62,35,.08);
   border-top:var(--hairline) solid var(--line);
   padding:7px 8px calc(5px + env(safe-area-inset-bottom));z-index:40;
-}
-@media (prefers-color-scheme: dark){
-  .tabbar{box-shadow:0 -6px 24px rgba(0,0,0,.4)}
 }
 .tab{
   flex:1;max-width:120px;display:flex;flex-direction:column;align-items:center;gap:2px;
