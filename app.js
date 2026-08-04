@@ -6,8 +6,9 @@
    Spaced Repetition: vereinfachtes SM-2 mit 3 Bewertungsstufen
    ===================================================================== */
 
-const APP_VERSION = '1.4.2';
+const APP_VERSION = '1.5.0';
 const CHANGELOG = [
+  { v: '1.5.0', date: '2026-08-04', notes: 'Neues Design: warmes Creme mit Pfirsich-Verlauf, Orange als Akzentfarbe, Serifen-Überschriften, Pill-Buttons und weiche Kartenschatten' },
   { v: '1.4.2', date: '2026-08-04', notes: 'Frequenz-Audit des Starterpakets (95,4% Token-Abdeckung bestätigt); 4 Kontraktions-Karten ergänzt (nesse/dessa/nele/naquele), die auch bestehende Warteschlangen automatisch erreichen' },
   { v: '1.4.1', date: '2026-08-04', notes: 'Vollständiger Qualitäts-Review des Starterpakets: alle 2.500 Einträge geprüft, 5 Fehler korrigiert (u.a. Konjugation von despedir und reunir, Idiom "Bem feito!"); Korrekturen erreichen automatisch auch schon freigeschaltete Karten' },
   { v: '1.4.0', date: '2026-08-04', notes: 'Neues Design in der Apple-Formensprache (iOS-Systemfarben, Inset-Cards, Hairlines, Blur-Tabbar, iOS-Dialoge), Tint-Farbe bleibt Brasilien-Grün' },
