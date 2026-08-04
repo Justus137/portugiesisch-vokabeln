@@ -6,8 +6,9 @@
    Spaced Repetition: vereinfachtes SM-2 mit 3 Bewertungsstufen
    ===================================================================== */
 
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.2.0';
 const CHANGELOG = [
+  { v: '1.2.0', date: '2026-08-04', notes: 'Starterpaket: die 2.500 häufigsten Vokabeln (OpenSubtitles-Frequenz) mit Beispielsätzen und Präsens-Konjugation bei Verben, 20 neue pro Tag' },
   { v: '1.1.0', date: '2026-08-03', notes: 'Problemwörter-Liste in der Vokabelübersicht, Tempo-Prognose auf dem Start-Screen, App-Badge mit fälligen Karten (installierte App, iOS 16.4+)' },
   { v: '1.0.1', date: '2026-08-03', notes: 'Countdown-Zieldatum auf 2.2.2027 korrigiert' },
   { v: '1.0.0', date: '2026-08-03', notes: 'Erste Version: Vokabeleingabe, Wochenübersicht, SM-2 Lern-Sessions (20 Min), Zufallsmodus, Export/Import, Auto-Snapshots, Statistik' }
@@ -16,6 +17,8 @@ const CHANGELOG = [
 const LS_KEY = 'ptvok.data.v1';
 const DAILY_GOAL = 10;
 const LEECH_LAPSES = 4;             // ab so vielen Fehlversuchen gilt ein Wort als Problemwort
+const PACK_URL = './deck-freq2500.json';
+const PACK_PER_DAY = 20;            // neue Starterpaket-Karten pro Tag
 const SESSION_MINUTES = 20;
 const SNAP_KEEP = 10;
 const MAX_INTERVAL = 180;           // Tage
@@ -100,7 +103,14 @@ function showConfirm({ title, text, confirmLabel = 'OK', cancelLabel = 'Abbreche
 let state = null;
 
 function defaultState() {
-  return { schemaVersion: 1, cards: [], activity: {}, meta: {} };
+  return { schemaVersion: 2, cards: [], activity: {}, meta: {} };
+}
+
+/* Lemma-Schluessel: Artikel und Alternativformen entfernen ("o amigo / a amiga" -> "amigo") */
+function dedupKey(pt) {
+  let s = String(pt || '').split('/')[0].trim();
+  s = s.replace(/^(o|a|os|as|um|uma)\s+/i, '');
+  return norm(s);
 }
 
 function loadData() {
@@ -218,6 +228,73 @@ function cardStatusClass(c) {
   return 'mature';
 }
 
+/* ================= Starterpaket (2.500 haeufigste Woerter) ================= */
+
+async function loadPack() {
+  const ok = await showConfirm({
+    title: 'Starterpaket laden?',
+    text: 'Die 2.500 häufigsten brasilianischen Vokabeln mit Beispielsätzen und Verb-Konjugationen werden hinzugefügt. Deine vorhandenen Vokabeln bleiben erhalten, Duplikate werden übersprungen. Danach schalten sich täglich 20 neue Karten frei.',
+    confirmLabel: 'Laden'
+  });
+  if (!ok) return;
+  try {
+    const res = await fetch(PACK_URL);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const deck = await res.json();
+    if (!deck || !Array.isArray(deck.words) || !deck.words.length) throw new Error('ungültige Deck-Datei');
+    const existing = new Set(state.cards.map((c) => dedupKey(c.pt)));
+    const queue = deck.words.filter((w) => w && w.pt && w.de && !existing.has(dedupKey(w.pt)));
+    state.pack = {
+      name: deck.name || 'Starterpaket',
+      total: deck.words.length,
+      queue,
+      added: 0,
+      perDay: PACK_PER_DAY,
+      lastUnlock: null
+    };
+    saveData();
+    const n = unlockPackCards(true);
+    renderCurrentView();
+    toast(`Starterpaket geladen · erste ${n} Vokabeln freigeschaltet ✓`, 3500);
+  } catch (e) {
+    console.error('loadPack', e);
+    toast('Starterpaket konnte nicht geladen werden (' + (e.message || 'Fehler') + ')', 4000);
+  }
+}
+
+/* Schaltet einmal pro Tag bis zu perDay neue Karten aus der Warteschlange frei */
+function unlockPackCards(force) {
+  const p = state.pack;
+  if (!p || !Array.isArray(p.queue) || !p.queue.length) return 0;
+  const t = today();
+  if (!force && p.lastUnlock === t) return 0;
+  const existing = new Set(state.cards.map((c) => dedupKey(c.pt)));
+  let n = 0;
+  while (n < (p.perDay || PACK_PER_DAY) && p.queue.length) {
+    const w = p.queue.shift();
+    if (!w || !w.pt || !w.de || existing.has(dedupKey(w.pt))) continue;
+    const card = newCard(w.pt, w.de, w.ex || '');
+    if (Array.isArray(w.c) && w.c.length === 6) card.conj = w.c;
+    card.pack = 1;
+    state.cards.push(card);
+    existing.add(dedupKey(w.pt));
+    n++;
+  }
+  p.added = (p.added || 0) + n;
+  p.lastUnlock = t;
+  saveData();
+  return n;
+}
+
+function maybeDailyUnlock() {
+  if (!state.pack) return;
+  const n = unlockPackCards(false);
+  if (n > 0) {
+    toast(`${n} neue Starterpaket-Vokabeln freigeschaltet 📦`, 3000);
+    if (!S) renderCurrentView();
+  }
+}
+
 /* ================= Views / Navigation ================= */
 
 let currentTab = 'home';
@@ -260,17 +337,26 @@ function updateBackupBadge() {
   $('#tab-backup-dot').classList.toggle('hidden', !backupDueInfo().show);
 }
 
-/* Prognose: bisheriges Eingabe-Tempo hochgerechnet bis zum Zieldatum */
+/* Prognose bis zum Zieldatum: eigenes Eingabe-Tempo hochgerechnet,
+   plus die planmaessigen Starterpaket-Freischaltungen */
 function prognosis() {
   if (!state.cards.length) return null;
   const rest = dayDiff(today(), TARGET_DATE);
   if (rest <= 0) return null;
+  const ownCards = state.cards.filter((c) => !c.pack).length;
   const elapsed = Math.max(1, dayDiff(firstDayStr(), today()) + 1);
-  const pace = state.cards.length / elapsed;
-  const projected = Math.max(state.cards.length, Math.round((state.cards.length + pace * rest) / 10) * 10);
+  const ownPace = ownCards / elapsed;
+  let projected = state.cards.length + ownPace * rest;
+  let packTxt = '';
+  if (state.pack && state.pack.queue.length) {
+    projected += Math.min(state.pack.queue.length, rest * (state.pack.perDay || PACK_PER_DAY));
+    packTxt = ' (inkl. Starterpaket)';
+  }
+  projected = Math.max(state.cards.length, Math.round(projected / 10) * 10);
   return {
-    paceTxt: pace.toLocaleString('de-DE', { maximumFractionDigits: 1 }),
-    projectedTxt: projected.toLocaleString('de-DE')
+    ownPaceTxt: ownPace.toLocaleString('de-DE', { maximumFractionDigits: 1 }),
+    projectedTxt: projected.toLocaleString('de-DE'),
+    packTxt
   };
 }
 
@@ -299,10 +385,22 @@ function renderHome() {
   const prog = prognosis();
   const progEl = $('#prognosis');
   if (prog) {
-    progEl.textContent = `Bei deinem Tempo (Ø ${prog.paceTxt}/Tag): ca. ${prog.projectedTxt} Vokabeln bis zum ${fmtShort(TARGET_DATE)}${TARGET_DATE.slice(0, 4)}`;
+    progEl.textContent = `Prognose${prog.packTxt}: ca. ${prog.projectedTxt} Vokabeln bis zum ${fmtShort(TARGET_DATE)}${TARGET_DATE.slice(0, 4)} · Ø ${prog.ownPaceTxt} eigene/Tag`;
     progEl.classList.remove('hidden');
   } else {
     progEl.classList.add('hidden');
+  }
+
+  $('#pack-banner').classList.toggle('hidden', !!state.pack);
+  const packEl = $('#pack-progress');
+  if (state.pack) {
+    const p = state.pack;
+    packEl.textContent = p.queue.length
+      ? `📦 Starterpaket: ${p.added}/${p.total} freigeschaltet · ${p.perDay} neue pro Tag`
+      : `📦 Starterpaket: komplett freigeschaltet (${p.added} Vokabeln)`;
+    packEl.classList.remove('hidden');
+  } else {
+    packEl.classList.add('hidden');
   }
 
   const info = backupDueInfo();
@@ -424,10 +522,27 @@ function renderWeeks() {
       .filter((c) => norm(c.pt).includes(q) || norm(c.de).includes(q) || norm(c.example).includes(q))
       .sort((a, b) => b.createdTs - a.createdTs);
     const shown = hits.slice(0, 100);
+    let lockedHTML = '';
+    if (state.pack && state.pack.queue.length) {
+      const locked = state.pack.queue
+        .filter((w) => norm(w.pt).includes(q) || norm(w.de).includes(q))
+        .slice(0, 50);
+      if (locked.length) {
+        lockedHTML = `<div class="day-head">Noch nicht freigeschaltet (Starterpaket)</div>` + locked.map((w) => `
+          <div class="vrow static">
+            <span class="vlock">🔒</span>
+            <div class="vmain">
+              <div class="vpt">${esc(w.pt)}</div>
+              <div class="vde">${esc(w.de)}</div>
+            </div>
+          </div>`).join('');
+      }
+    }
     wrap.innerHTML = `<div class="week">` + (shown.length
       ? shown.map((c) => vrowHTML(c, true)).join('')
-      : '<div class="empty-state">Keine Treffer.</div>')
+      : (lockedHTML ? '' : '<div class="empty-state">Keine Treffer.</div>'))
       + (hits.length > shown.length ? `<div class="more-note">${hits.length - shown.length} weitere Treffer, bitte Suche verfeinern.</div>` : '')
+      + lockedHTML
       + `</div>`;
     return;
   }
@@ -615,6 +730,18 @@ function nextCard() {
   $('#fc-example').textContent = c.example || '';
   $('#fc-example').style.display = c.example ? '' : 'none';
   $('#fc-back-small').textContent = c.pt;
+
+  const conjEl = $('#fc-conj');
+  if (Array.isArray(c.conj) && c.conj.length === 6) {
+    const labels = ['eu', 'tu', 'ele/ela', 'nós', 'vós', 'eles/elas'];
+    const order = [0, 3, 1, 4, 2, 5]; // Spaltenweise: Singular links, Plural rechts
+    conjEl.innerHTML = order.map((i) => `<span>${labels[i]} <b>${esc(c.conj[i])}</b></span>`).join('');
+    conjEl.classList.remove('hidden');
+  } else {
+    conjEl.innerHTML = '';
+    conjEl.classList.add('hidden');
+  }
+
   $('#rate-row').classList.remove('show');
   updateSessionInfo();
 }
@@ -708,12 +835,13 @@ async function confirmAbort() {
 function exportObject() {
   return {
     app: 'portugiesisch-vokabeln',
-    schemaVersion: 1,
+    schemaVersion: 2,
     appVersion: APP_VERSION,
     exportedAt: new Date().toISOString(),
     cards: state.cards,
     activity: state.activity,
-    meta: state.meta
+    meta: state.meta,
+    pack: state.pack || null
   };
 }
 
@@ -753,7 +881,7 @@ async function exportData() {
 function normalizeImported(obj) {
   if (!obj || typeof obj !== 'object') throw new Error('Keine gültige JSON-Datei.');
   if (!Array.isArray(obj.cards)) throw new Error('Datei enthält keine Vokabelliste (cards).');
-  if (typeof obj.schemaVersion === 'number' && obj.schemaVersion > 1) {
+  if (typeof obj.schemaVersion === 'number' && obj.schemaVersion > 2) {
     throw new Error('Backup stammt aus einer neueren App-Version.');
   }
   const t = today();
@@ -776,14 +904,32 @@ function normalizeImported(obj) {
       due: /^\d{4}-\d{2}-\d{2}$/.test(raw.due) ? raw.due : t,
       last: /^\d{4}-\d{2}-\d{2}$/.test(raw.last) ? raw.last : null
     };
+    if (Array.isArray(raw.conj) && raw.conj.length === 6 && raw.conj.every((f) => typeof f === 'string' && f)) {
+      c.conj = raw.conj;
+    }
+    if (raw.pack) c.pack = 1;
     cards.push(c);
   }
+
+  let pack;
+  if (obj.pack && typeof obj.pack === 'object' && Array.isArray(obj.pack.queue)) {
+    pack = {
+      name: typeof obj.pack.name === 'string' ? obj.pack.name : 'Starterpaket',
+      total: typeof obj.pack.total === 'number' ? obj.pack.total : obj.pack.queue.length,
+      queue: obj.pack.queue.filter((w) => w && typeof w.pt === 'string' && typeof w.de === 'string'),
+      added: typeof obj.pack.added === 'number' ? obj.pack.added : 0,
+      perDay: typeof obj.pack.perDay === 'number' && obj.pack.perDay > 0 ? obj.pack.perDay : PACK_PER_DAY,
+      lastUnlock: /^\d{4}-\d{2}-\d{2}$/.test(obj.pack.lastUnlock) ? obj.pack.lastUnlock : null
+    };
+  }
+
   return {
     newState: {
-      schemaVersion: 1,
+      schemaVersion: 2,
       cards,
       activity: (obj.activity && typeof obj.activity === 'object') ? obj.activity : {},
-      meta: Object.assign({}, (obj.meta && typeof obj.meta === 'object') ? obj.meta : {})
+      meta: Object.assign({}, (obj.meta && typeof obj.meta === 'object') ? obj.meta : {}),
+      pack
     },
     imported: cards.length,
     skipped,
@@ -911,6 +1057,19 @@ function renderBackup() {
   }
   $('#last-export').textContent = txt;
 
+  const packStatus = $('#pack-status');
+  const packBtn = $('#btn-pack-load');
+  if (state.pack) {
+    const p = state.pack;
+    packStatus.textContent = p.queue.length
+      ? `${p.added} von ${p.total} Vokabeln freigeschaltet, ${p.queue.length} warten noch (${p.perDay} pro Tag). Quelle: OpenSubtitles-Frequenzliste (CC-BY-SA), Konjugationen geprüft gegen Wiktionary.`
+      : `Komplett: alle ${p.added} Vokabeln sind freigeschaltet.`;
+    packBtn.classList.add('hidden');
+  } else {
+    packStatus.textContent = 'Die 2.500 häufigsten brasilianischen Vokabeln mit Beispielsätzen und Verb-Konjugationen. Nach dem Laden schalten sich täglich 20 neue Karten frei, deine eigenen Vokabeln bleiben unberührt.';
+    packBtn.classList.remove('hidden');
+  }
+
   $('#app-version').textContent = 'v' + APP_VERSION;
   let size = 0;
   try { size = new Blob([JSON.stringify(state)]).size; } catch (e) { /* egal */ }
@@ -1004,6 +1163,9 @@ function bindEvents() {
   document.querySelectorAll('.rate').forEach((b) => b.addEventListener('click', () => rate(Number(b.dataset.grade))));
   $('#session-close').addEventListener('click', confirmAbort);
 
+  $('#pack-load-btn').addEventListener('click', loadPack);
+  $('#btn-pack-load').addEventListener('click', loadPack);
+
   $('#btn-export').addEventListener('click', exportData);
   $('#btn-import').addEventListener('click', () => $('#file-import').click());
   $('#file-import').addEventListener('change', (e) => {
@@ -1018,6 +1180,7 @@ function bindEvents() {
 
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
+      maybeDailyUnlock();
       maybeDailySnapshot();
       if (!S) renderCurrentView();
     }
@@ -1028,6 +1191,7 @@ function bindEvents() {
 function init() {
   loadData();
   bindEvents();
+  maybeDailyUnlock();
   renderCurrentView();
   maybeDailySnapshot();
   updateBadge();

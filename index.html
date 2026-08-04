@@ -42,11 +42,17 @@
       <button class="icon-btn icon-btn-small" id="badge-hint-close" aria-label="Hinweis schließen" type="button">&#10005;</button>
     </div>
 
+    <div id="pack-banner" class="banner banner-info hidden">
+      <div class="banner-text"><strong>Starterpaket:</strong> die 2.500 häufigsten Vokabeln mit Beispielsätzen und Verb-Konjugation laden? Danach schalten sich täglich 20 neue frei.</div>
+      <button class="btn btn-small btn-primary" id="pack-load-btn" type="button">Laden</button>
+    </div>
+
     <div class="stats-row">
       <div class="stat"><div class="stat-num stat-due" id="stat-due">0</div><div class="stat-label">fällig heute</div></div>
       <div class="stat"><div class="stat-num" id="stat-streak">0</div><div class="stat-label">Tage Streak</div></div>
       <div class="stat"><div class="stat-num" id="stat-total">0</div><div class="stat-label">Vokabeln</div></div>
     </div>
+    <p class="sub small pack-line hidden" id="pack-progress"></p>
 
     <button class="btn btn-play" id="btn-play" type="button" aria-label="Lernen starten">
       <span class="play-icon" aria-hidden="true">
@@ -117,6 +123,12 @@
     </div>
 
     <div class="card">
+      <h2>Starterpaket</h2>
+      <p class="sub small" id="pack-status"></p>
+      <button class="btn btn-secondary" id="btn-pack-load" type="button">Starterpaket laden (2.500 Vokabeln)</button>
+    </div>
+
+    <div class="card">
       <h2>Automatische Snapshots</h2>
       <p class="sub small">Beim ersten Öffnen pro Tag wird automatisch eine Sicherheitskopie gespeichert. Die letzten 10 bleiben erhalten und können hier wiederhergestellt werden.</p>
       <div id="snap-list"></div>
@@ -172,6 +184,7 @@
         <div class="fc-chip">Deutsch</div>
         <div class="fc-word fc-word-back" id="fc-back-word"></div>
         <div class="fc-example" id="fc-example"></div>
+        <div class="fc-conj hidden" id="fc-conj"></div>
         <div class="fc-small" id="fc-back-small"></div>
       </div>
     </div>

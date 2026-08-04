@@ -8,12 +8,19 @@ Läuft komplett im Browser, alle Daten bleiben lokal auf dem Gerät (localStorag
 ## Features
 
 - Tägliche Eingabe von Vokabeln (Ziel: 10 pro Tag), automatisch nach Datum und Woche gruppiert
-- Wochenübersicht mit Bearbeiten und Löschen (Suche über alle Vokabeln)
+- Starterpaket: die 2.500 häufigsten brasilianischen Vokabeln (`deck-freq2500.json`) mit Beispielsätzen und Präsens-Konjugation bei Verben, Freischaltung 20 pro Tag
+- Wochenübersicht mit Bearbeiten und Löschen (Suche über alle Vokabeln, auch noch gesperrte Paket-Wörter)
 - Lern-Session mit 20-Minuten-Timer und Spaced Repetition (vereinfachtes SM-2, 3 Bewertungsstufen)
 - Zufallsmodus ohne Einfluss auf den Lernplan
-- Backup: JSON-Export/-Import, Erinnerung nach 7 Tagen, automatische tägliche Snapshots (IndexedDB, die letzten 10)
-- Statistik: fällige Karten, Lernstreak, Gesamtzahl
+- Backup: JSON-Export/-Import (inkl. Paket-Warteschlange), Erinnerung nach 7 Tagen, automatische tägliche Snapshots (IndexedDB, die letzten 10)
+- Statistik: fällige Karten, Lernstreak, Gesamtzahl, Prognose bis zum Zieldatum
 - Offline-fähig per Service Worker, als App auf dem iPhone installierbar
+
+## Quellen und Lizenz des Starterpakets
+
+- Frequenzbasis: [hermitdave/FrequencyWords](https://github.com/hermitdave/FrequencyWords) (OpenSubtitles 2018, pt_br), Lizenz CC-BY-SA-4.0
+- Konjugationen: regelbasiert generiert (`tools/build_deck.py`), unregelmäßige Verben stichprobengeprüft gegen [Wiktionary](https://en.wiktionary.org) (CC-BY-SA)
+- Die abgeleitete Wortliste `deck-freq2500.json` steht damit ebenfalls unter CC-BY-SA-4.0
 
 ## Auf dem iPhone installieren
 
