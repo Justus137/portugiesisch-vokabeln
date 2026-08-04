@@ -6,8 +6,9 @@
    Spaced Repetition: vereinfachtes SM-2 mit 3 Bewertungsstufen
    ===================================================================== */
 
-const APP_VERSION = '1.4.1';
+const APP_VERSION = '1.4.2';
 const CHANGELOG = [
+  { v: '1.4.2', date: '2026-08-04', notes: 'Frequenz-Audit des Starterpakets (95,4% Token-Abdeckung bestätigt); 4 Kontraktions-Karten ergänzt (nesse/dessa/nele/naquele), die auch bestehende Warteschlangen automatisch erreichen' },
   { v: '1.4.1', date: '2026-08-04', notes: 'Vollständiger Qualitäts-Review des Starterpakets: alle 2.500 Einträge geprüft, 5 Fehler korrigiert (u.a. Konjugation von despedir und reunir, Idiom "Bem feito!"); Korrekturen erreichen automatisch auch schon freigeschaltete Karten' },
   { v: '1.4.0', date: '2026-08-04', notes: 'Neues Design in der Apple-Formensprache (iOS-Systemfarben, Inset-Cards, Hairlines, Blur-Tabbar, iOS-Dialoge), Tint-Farbe bleibt Brasilien-Grün' },
   { v: '1.3.0', date: '2026-08-04', notes: 'Aussprache per Lautsprecher-Button (brasilianische Systemstimme, offline) und deutsche Übersetzung unter jedem Beispielsatz des Starterpakets' },
@@ -365,6 +366,11 @@ async function syncPackContent() {
     }
     if (state.pack) {
       state.pack.queue = state.pack.queue.map((q) => map.get(dedupKey(q.pt)) || q);
+      // Neu ins Deck aufgenommene Woerter vorne einreihen (hohe Frequenz)
+      const have = new Set(state.cards.map((c) => dedupKey(c.pt)).concat(state.pack.queue.map((q) => dedupKey(q.pt))));
+      const missing = deck.words.filter((w) => !have.has(dedupKey(w.pt)));
+      if (missing.length) state.pack.queue = missing.concat(state.pack.queue);
+      state.pack.total = deck.words.length;
     }
     state.meta.packSyncV = deckV;
     saveData();
