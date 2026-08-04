@@ -6,8 +6,9 @@
    Spaced Repetition: vereinfachtes SM-2 mit 3 Bewertungsstufen
    ===================================================================== */
 
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.0';
 const CHANGELOG = [
+  { v: '1.4.0', date: '2026-08-04', notes: 'Neues Design in der Apple-Formensprache (iOS-Systemfarben, Inset-Cards, Hairlines, Blur-Tabbar, iOS-Dialoge), Tint-Farbe bleibt Brasilien-Grün' },
   { v: '1.3.0', date: '2026-08-04', notes: 'Aussprache per Lautsprecher-Button (brasilianische Systemstimme, offline) und deutsche Übersetzung unter jedem Beispielsatz des Starterpakets' },
   { v: '1.2.1', date: '2026-08-04', notes: 'Zufallsmodus zieht nur noch Vokabeln, die schon mindestens einmal gelernt wurden' },
   { v: '1.2.0', date: '2026-08-04', notes: 'Starterpaket: die 2.500 häufigsten Vokabeln (OpenSubtitles-Frequenz) mit Beispielsätzen und Präsens-Konjugation bei Verben, 20 neue pro Tag' },
