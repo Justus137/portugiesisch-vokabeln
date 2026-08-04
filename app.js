@@ -6,8 +6,9 @@
    Spaced Repetition: vereinfachtes SM-2 mit 3 Bewertungsstufen
    ===================================================================== */
 
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.4.1';
 const CHANGELOG = [
+  { v: '1.4.1', date: '2026-08-04', notes: 'Vollständiger Qualitäts-Review des Starterpakets: alle 2.500 Einträge geprüft, 5 Fehler korrigiert (u.a. Konjugation von despedir und reunir, Idiom "Bem feito!"); Korrekturen erreichen automatisch auch schon freigeschaltete Karten' },
   { v: '1.4.0', date: '2026-08-04', notes: 'Neues Design in der Apple-Formensprache (iOS-Systemfarben, Inset-Cards, Hairlines, Blur-Tabbar, iOS-Dialoge), Tint-Farbe bleibt Brasilien-Grün' },
   { v: '1.3.0', date: '2026-08-04', notes: 'Aussprache per Lautsprecher-Button (brasilianische Systemstimme, offline) und deutsche Übersetzung unter jedem Beispielsatz des Starterpakets' },
   { v: '1.2.1', date: '2026-08-04', notes: 'Zufallsmodus zieht nur noch Vokabeln, die schon mindestens einmal gelernt wurden' },
@@ -339,35 +340,33 @@ function maybeDailyUnlock() {
   }
 }
 
-/* Einmalige Nachruestung: deutsche Beispielsatz-Uebersetzungen fuer Karten,
-   die noch aus einer Deck-Version ohne "exd" stammen */
-async function backfillPackTranslations() {
-  if (state.meta.exdBackfill) return;
-  const needCards = state.cards.some((c) => c.pack && c.example && !c.exampleDe);
-  const needQueue = !!(state.pack && state.pack.queue.length && !state.pack.queue[0].exd);
-  if (!needCards && !needQueue) {
-    if (state.pack || state.cards.some((c) => c.pack)) { state.meta.exdBackfill = true; saveData(); }
-    return;
-  }
+/* Haelt Starterpaket-Inhalte aktuell: wenn die Deck-Datei eine neuere Version
+   hat (z.B. nach Korrekturen), werden Uebersetzung, Beispielsatz, Satz-
+   uebersetzung und Konjugation bereits freigeschalteter Karten sowie die
+   Warteschlange auf den neuen Stand gebracht. Eigene Karten bleiben unberuehrt. */
+async function syncPackContent() {
+  const hasPackData = state.pack || state.cards.some((c) => c.pack);
+  if (!hasPackData) return;
   try {
     const res = await fetch(PACK_URL);
     if (!res.ok) return;
     const deck = await res.json();
+    const deckV = deck.version || 1;
+    if (state.meta.packSyncV === deckV) return;
     const map = new Map(deck.words.map((w) => [dedupKey(w.pt), w]));
     for (const c of state.cards) {
-      if (c.pack && !c.exampleDe) {
-        const w = map.get(dedupKey(c.pt));
-        if (w && w.exd) c.exampleDe = w.exd;
-      }
+      if (!c.pack) continue;
+      const w = map.get(dedupKey(c.pt));
+      if (!w) continue;
+      c.de = w.de;
+      c.example = w.ex || '';
+      if (w.exd) c.exampleDe = w.exd; else delete c.exampleDe;
+      if (Array.isArray(w.c) && w.c.length === 6) c.conj = w.c; else delete c.conj;
     }
     if (state.pack) {
-      state.pack.queue = state.pack.queue.map((q) => {
-        if (q.exd) return q;
-        const w = map.get(dedupKey(q.pt));
-        return (w && w.exd) ? Object.assign({}, q, { exd: w.exd }) : q;
-      });
+      state.pack.queue = state.pack.queue.map((q) => map.get(dedupKey(q.pt)) || q);
     }
-    state.meta.exdBackfill = true;
+    state.meta.packSyncV = deckV;
     saveData();
     if (!S) renderCurrentView();
   } catch (e) { /* beim naechsten Start erneut versuchen */ }
@@ -1298,7 +1297,7 @@ function init() {
   bindEvents();
   maybeDailyUnlock();
   renderCurrentView();
-  backfillPackTranslations();
+  syncPackContent();
   maybeDailySnapshot();
   updateBadge();
   if ('serviceWorker' in navigator) {
